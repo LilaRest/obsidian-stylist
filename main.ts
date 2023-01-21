@@ -17,37 +17,39 @@ const makeScopedStyles = (rootSelector: string, source: string): string =>
     .join('\n');
 
 export default class extends Plugin {
-    private lastClassName: string | undefined;
 
     onload() {
+        // Render the 'style' code blocks
         this.registerMarkdownCodeBlockProcessor('style', (source, element) => {
             element.createEl('style', {
                 text: makeScopedStyles('.markdown-preview-view', source)
             });
         });
 
+        // Render the custom block classes
+        let nextBlockClass: string | null = null;
         this.registerMarkdownPostProcessor((element) => {
-            if (element.hasClass('next-class-skip')) {
+
+            // If the previous element was a custom class block
+            if (nextBlockClass) {
+
+                // Add the custom class to the current element
+                element.classList.add(nextBlockClass);
+
+                // Reset the nextBlockClass and return
+                nextBlockClass = null;
                 return;
             }
 
-            if (this.lastClassName !== undefined) {
-                element.classList.add(...this.lastClassName.split(/\s+/));
-                this.lastClassName = undefined;
-            }
+            // Else if the current block is a custom class block
+            const classBlock = [...element.querySelectorAll('code')].find((codeEl) => codeEl.innerText.trim().startsWith(CLASSNAME_TAG));
+            if (classBlock) {
 
-            const codeElements = element.querySelectorAll('code');
-
-            const classElement = [...codeElements].find(
-                (element) => element.innerText.trim().startsWith(CLASSNAME_TAG)
-            );
-
-            if (classElement) {
-                this.lastClassName = classElement.innerText.slice(CLASSNAME_TAG.length);
-                if (classElement.parentElement?.childElementCount === 1) {
-                    classElement.parentElement.remove();
-                }
-                element.classList.add('next-class-skip');
+                // Retrieve the custom class name for the next block
+                nextBlockClass = classBlock.innerText.trim().replace(CLASSNAME_TAG, "").trim();
+                
+                // Remove the classBlock element from the render
+                classBlock.parentElement?.remove()
             }
         });
     }
